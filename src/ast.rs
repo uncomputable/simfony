@@ -591,7 +591,7 @@ impl Scope {
     }
 
     /// Track a call expression with its span.
-    pub fn track_call<S: AsRef<Span>>(&mut self, span: S, name: TrackedCallName) {
+    pub fn track_call<S: AsRef<Span>>(&mut self, span: &S, name: TrackedCallName) {
         self.tracked_calls.push((*span.as_ref(), name));
     }
 }

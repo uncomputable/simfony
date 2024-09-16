@@ -12,7 +12,7 @@ use crate::ast::{
     Call, CallName, Expression, ExpressionInner, Match, Program, SingleExpression,
     SingleExpressionInner, Statement,
 };
-use crate::error::{Error, RichError, WithSpan};
+use crate::error::{Error, RichError, Span, WithSpan};
 use crate::named::{CoreExt, PairBuilder};
 use crate::num::{NonZeroPow2Usize, Pow2Usize};
 use crate::pattern::{BasePattern, Pattern};
@@ -292,16 +292,21 @@ impl Call {
         //
         // The debug symbol is attached in such a way that a Simplicity runtime without support
         // for debug symbols will simply ignore it. The semantics of the program remain unchanged.
-        let with_debug_symbol = |args, body| {
+        fn with_debug_symbol<S: AsRef<Span>>(
+            args: PairBuilder<ProgNode>,
+            body: &ProgNode,
+            scope: &mut Scope,
+            span: &S,
+        ) -> Result<PairBuilder<ProgNode>, RichError> {
             let false_and_args = ProgNode::bit(scope.ctx(), false).pair(args);
-            let nop_assert = ProgNode::assertl_drop(body, self.as_ref().cmr());
-            false_and_args.comp(&nop_assert).with_span(self)
-        };
+            let nop_assert = ProgNode::assertl_drop(body, span.as_ref().cmr());
+            false_and_args.comp(&nop_assert).with_span(span)
+        }
 
         match self.name() {
             CallName::Jet(name) => {
                 let jet = ProgNode::jet(scope.ctx(), *name);
-                with_debug_symbol(args, &jet)
+                with_debug_symbol(args, &jet, scope, self)
             }
             CallName::UnwrapLeft(..) => {
                 let input_and_unit =
@@ -311,7 +316,7 @@ impl Call {
                     Cmr::fail(FailEntropy::ZERO),
                 );
                 let body = input_and_unit.comp(&extract_inner).with_span(self)?;
-                with_debug_symbol(args, body.as_ref())
+                with_debug_symbol(args, body.as_ref(), scope, self)
             }
             CallName::UnwrapRight(..) | CallName::Unwrap => {
                 let input_and_unit =
@@ -321,7 +326,7 @@ impl Call {
                     &ProgNode::iden(scope.ctx()),
                 );
                 let body = input_and_unit.comp(&extract_inner).with_span(self)?;
-                with_debug_symbol(args, body.as_ref())
+                with_debug_symbol(args, body.as_ref(), scope, self)
             }
             CallName::IsNone(..) => {
                 let input_and_unit =
@@ -332,12 +337,12 @@ impl Call {
             }
             CallName::Assert => {
                 let jet = ProgNode::jet(scope.ctx(), Elements::Verify);
-                with_debug_symbol(args, &jet)
+                with_debug_symbol(args, &jet, scope, self)
             }
             CallName::Panic => {
                 // panic! ignores its arguments
                 let fail = ProgNode::fail(scope.ctx(), FailEntropy::ZERO);
-                with_debug_symbol(args, &fail)
+                with_debug_symbol(args, &fail, scope, self)
             }
             CallName::Debug => {
                 // dbg! computes the identity function
