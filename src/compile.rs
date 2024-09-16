@@ -339,6 +339,11 @@ impl Call {
                 let fail = ProgNode::fail(scope.ctx(), FailEntropy::ZERO);
                 with_debug_symbol(args, &fail)
             }
+            CallName::Debug => {
+                // dbg! computes the identity function
+                let iden = ProgNode::iden(scope.ctx());
+                with_debug_symbol(args, &iden)
+            }
             CallName::TypeCast(..) => {
                 // A cast converts between two structurally equal types.
                 // Structural equality of Simfony types A and B means
