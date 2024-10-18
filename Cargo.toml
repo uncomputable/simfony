@@ -33,6 +33,9 @@ either = "1.12.0"
 itertools = "0.13.0"
 arbitrary = { version = "1", optional = true, features = ["derive"] }
 
+[patch.crates-io]
+secp256k1-zkp = { git = "https://github.com/BlockstreamResearch/rust-secp256k1-zkp", rev = "0a3e73cf77236f967b2faab47909ba535273fd9a" }
+
 [target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 
