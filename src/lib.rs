@@ -249,7 +249,9 @@ pub trait ArbitraryOfType: Sized {
 mod tests {
     use base64::display::Base64Display;
     use base64::engine::general_purpose::STANDARD;
-    use simplicity::BitMachine;
+    use miniscript::bitcoin::hex::DisplayHex;
+    use simplicity::ffi::tests::ffi::SimplicityErr;
+    use simplicity::ffi::tests::{run_program_with_env, TestUpTo};
     use std::borrow::Cow;
     use std::path::Path;
 
@@ -389,12 +391,26 @@ mod tests {
             self
         }
 
-        fn run(self) -> Result<(), simplicity::bit_machine::ExecutionError> {
+        fn run(self) -> Result<(), SimplicityErr> {
             let env = dummy_env::dummy_with(self.lock_time, self.sequence, self.include_fee_output);
-            let pruned = self.program.redeem().prune(&env)?;
-            let mut mac = BitMachine::for_program(&pruned)
-                .expect("program should be within reasonable bounds");
-            mac.exec(&pruned, &env).map(|_| ())
+            let (program_bytes, witness_bytes) = self
+                .program
+                .redeem()
+                .prune(&env)
+                .expect("program should run")
+                .encode_to_vec();
+            dbg!(
+                program_bytes.to_lower_hex_string(),
+                witness_bytes.to_lower_hex_string()
+            );
+            let _ = run_program_with_env(
+                &program_bytes,
+                &witness_bytes,
+                TestUpTo::Everything,
+                env.c_tx_env(),
+            )?;
+            assert!(false);
+            Ok(())
         }
 
         pub fn assert_run_success(self) {
