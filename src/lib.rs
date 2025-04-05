@@ -247,15 +247,15 @@ pub trait ArbitraryOfType: Sized {
 
 #[cfg(test)]
 mod tests {
+    use crate::*;
     use base64::display::Base64Display;
     use base64::engine::general_purpose::STANDARD;
     use miniscript::bitcoin::hex::DisplayHex;
     use simplicity::ffi::tests::ffi::SimplicityErr;
     use simplicity::ffi::tests::{run_program_with_env, TestUpTo};
+    use simplicity::BitIter;
     use std::borrow::Cow;
     use std::path::Path;
-
-    use crate::*;
 
     struct TestCase<T> {
         program: T,
@@ -393,6 +393,8 @@ mod tests {
 
         fn run(self) -> Result<(), SimplicityErr> {
             let env = dummy_env::dummy_with(self.lock_time, self.sequence, self.include_fee_output);
+            let (unpruned_program_bytes, unpruned_witness_bytes) =
+                self.program.redeem().encode_to_vec();
             let (program_bytes, witness_bytes) = self
                 .program
                 .redeem()
@@ -400,16 +402,28 @@ mod tests {
                 .expect("program should run")
                 .encode_to_vec();
             dbg!(
+                unpruned_program_bytes.to_lower_hex_string(),
+                unpruned_witness_bytes.to_lower_hex_string()
+            );
+            dbg!(
                 program_bytes.to_lower_hex_string(),
                 witness_bytes.to_lower_hex_string()
             );
+            let prog_iter = BitIter::from(unpruned_program_bytes.into_iter());
+            let wit_iter = BitIter::from(unpruned_witness_bytes.into_iter());
+            let unpruned = RedeemNode::<Elements>::decode(prog_iter, wit_iter)
+                .expect("unpruned should decode");
+            assert_eq!(self.program.redeem().cmr(), unpruned.cmr());
+            let prog_iter = BitIter::from(program_bytes.iter().copied());
+            let wit_iter = BitIter::from(witness_bytes.iter().copied());
+            let _ =
+                RedeemNode::<Elements>::decode(prog_iter, wit_iter).expect("pruned should decode");
             let _ = run_program_with_env(
                 &program_bytes,
                 &witness_bytes,
                 TestUpTo::Everything,
                 env.c_tx_env(),
             )?;
-            assert!(false);
             Ok(())
         }
 
